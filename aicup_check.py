@@ -84,6 +84,7 @@ async def print_response_stream(prompt):
 
 #紀錄該段落是否已經通過檢測的dict，key 為段落；value 為是否通過(1為通過，0為未通過)
 Passed = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 8: 0}
+minWords = {1: 200, 2: 400, 3: 300, 4: 300, 5: 400, 6: 400, 8: 1}
 
 #檢查用的function，input_text為要檢核的段落內容；part為第幾段
 #關鍵字: 檢核通過  (如果AI回覆為通過，則務必請AI在reply中加入繁體 "檢核成功" 以方便判定)
@@ -105,12 +106,11 @@ def check(input_text, part):
     system_prompt = \
         "等一下將會輸入一些條件與一個要檢核的段落，請你幫我檢測要檢核的段落有沒有符合條件。 \
         輸入的格式為  「輸入開始: 條件 + 要檢核的段落（條件與要檢核的段落中間以“+”分隔）輸入結束」。 \
-        請嚴格檢查(保留一點點彈性)要檢核的段落有沒有符合條件。如果有，請馬上回覆\"檢核成功Passed\"並且提供理由；如果沒有通過，請馬上回覆\"檢核失敗\"並且提供理由。\
-        如果要檢核的段落太短，馬上回覆\"檢核失敗\"即可 \
+        請嚴格檢查(保留一點彈性)要檢核的段落有沒有符合條件。如果有，請「馬上、立刻、立即」回覆\"檢核成功Passed\"並且提供理由；如果沒有通過，請馬上回覆\"檢核失敗\"並且提供理由。\
         輸入開始:  條件: " + condition[part] + " + "
 
     
-    prompt = f"<s>[INST] <<SYS>>\n{system_prompt}\n<</SYS>>\n\n 要檢核的段落: {input_text} 輸入結束。一定要馬上回覆\"檢核成功Passed\"或\"檢核失敗\"。[/INST]\n"
+    prompt = f"<s>[INST] <<SYS>>\n{system_prompt}\n<</SYS>>\n\n 要檢核的段落: {input_text}。\n\n一定要「馬上、立刻、立即」回覆\"檢核成功Passed\"或\"檢核失敗\"。[/INST]\n"
 
 
     
@@ -118,11 +118,13 @@ def check(input_text, part):
     parser = ArgumentParser(prog='General debug things')
     parser.add_argument('--msg', type=str)
     args = parser.parse_args()
-
-    response=asyncio.run(print_response_stream(prompt))
-
+    if len(input_text) > minWords[part]:
+        response=asyncio.run(print_response_stream(prompt))
+    else:
+        response = "字數不足，請至少提供" + str(minWords[part]) + "字"
+        
     #更新通過紀錄Passed
-    if "檢核成功Passed" in response:
+    if "檢核成功Passed" in response or "檢核成功 Passed" in response or "檢核成功 PASS" in response or "檢核成功PASS" in response:
         Passed[part] = 1
         gr.Info("檢核通過 !")
     else:
