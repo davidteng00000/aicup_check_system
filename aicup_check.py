@@ -71,11 +71,16 @@ async def run(context):
             incoming_data = await websocket.recv()
             incoming_data = json.loads(incoming_data)
 
-            match incoming_data['event']:
-                case 'text_stream':
-                    yield incoming_data['text']
-                case 'stream_end':
-                    return
+            # match incoming_data['event']:
+            #     case 'text_stream':
+            #         yield incoming_data['text']
+            #     case 'stream_end':
+            #         return
+            if incoming_data['event'] == 'text_stream':
+                yield incoming_data['text']
+            elif incoming_data['event'] == 'stream_end':
+                return
+            
 async def print_response_stream(prompt):
     answer=""
     async for response in run(prompt):   
@@ -253,4 +258,4 @@ with gr.Blocks() as demo:
     
         
 if __name__ == "__main__":
-    demo.queue(max_size=20).launch(share=True)
+    demo.launch(server_name='0.0.0.0',server_port=8075)
