@@ -78,7 +78,7 @@ async def run(context):
             #         return
             if incoming_data['event'] == 'text_stream':
                 yield incoming_data['text']
-            elif incoming_data['event'] == 'stream_end':
+            elif incoming_data['event'] == 'text_stream':
                 return
             
 async def print_response_stream(prompt):
@@ -258,4 +258,4 @@ with gr.Blocks() as demo:
     
         
 if __name__ == "__main__":
-    demo.launch(server_name='0.0.0.0',server_port=8075)
+    demo.queue(max_size=20).launch(share=True)
