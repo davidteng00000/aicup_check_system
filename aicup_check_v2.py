@@ -82,8 +82,8 @@ async def run(input_text: str, part: int):    # 原名main
     system_prompt = """等一下將會輸入一些條件與一個要檢核的段落，請你幫我檢測要檢核的段落有沒有符合條件。 
     輸入的格式為  「輸入開始: 條件 + 要檢核的段落（條件與要檢核的段落中間以“+”分隔）輸入結束」。 
     請嚴格檢查(保留一點彈性)要檢核的段落有沒有符合條件。如果有，請「馬上、立刻、立即」回覆\"檢核成功Passed\"並且提供理由；如果沒有通過，請馬上回覆\"檢核失敗\"並且提供理由。
-    輸入開始:  條件: """ + condition[part] + " + "
-    prompt = f"<s>[INST] <<SYS>>\n{system_prompt}\n<</SYS>>\n\n 要檢核的段落: {input_text}。\n\n一定要「馬上、立刻、立即」回覆\"檢核成功Passed\"或\"檢核失敗\"。[/INST]\n"
+    """
+    prompt = f"<s>[INST] <<SYS>>\n{system_prompt}\n<</SYS>>\n輸入開始:  條件: + {condition[part]} + 要檢核的段落: {input_text}。\n\n一定要「馬上、立刻、立即」回覆\"檢核成功Passed\"或\"檢核失敗\"。[/INST]\n"
     request = create_request(prompt)
     result = await connect_websocket(URI, request)
     # print('Result', result)
@@ -115,7 +115,7 @@ def getPassed(Passed: list[int]):
 def update_label(Passed: list[int]):
     # PassList = getPassed(Passed)
     PassList = Passed
-    progress = (PassList[1] + PassList[2] + PassList[3] + PassList[4] + PassList[5] + PassList[6] + PassList[8])/7
+    progress = int((PassList[1] + PassList[2] + PassList[3] + PassList[4] + PassList[5] + PassList[6] + PassList[8])/7*100)
     dict = {
         "完成度" + str(progress) + "%": 1,
         "壹、環境": PassList[1],
