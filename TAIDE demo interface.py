@@ -5,31 +5,32 @@ import os
 import asyncio
 import json
 import sys
- 
- 
+
+
 try:
     import websockets
 except ImportError:
     print("Websockets package not found. Make sure it's installed.")
- 
- 
+
+
 DESCRIPTION = """\
 # TAIDE Demo site
 """
- 
+
 LICENSE = """
 Not publish yet
 """
-HOST = '203.145.216.157:60000'
+
+HOST = 'latest.model.taide.z12.tw'
 URI = f'ws://{HOST}/api/v1/stream'
 INFERENCE_ADDRESS = URI
- 
+
 MAX_MAX_NEW_TOKENS = 1024
 DEFAULT_MAX_NEW_TOKENS = 250
 MAX_INPUT_TOKEN_LENGTH = 4096
- 
+
 conversations = []
- 
+
 async def generate(
     message: str,
     chat_history: list[tuple[str, str]],
@@ -46,21 +47,21 @@ async def generate(
     # Note: before we publish the service, we need to limit the parameters that will been accepts.
     if len(chat_history) == 0:
         conversations = []
- 
+
     conversations.append({
         'role': 'user',
         'content': message,
     })
- 
+    
     # prompt = [f'<s>[INST] {c["content"]} [/INST]' if c['role'] == 'user' else c['content'] for c in conversations]
-    prompt = [f"<s>[INST] <<SYS>>\n{system_prompt}\n<</SYS>>\n\n {c['content']} [/INST]\n" if system_prompt and i == 0 else f'<s>[INST] {c["content"]} [/INST]\n' if c['role'] == 'user' else c['content'] for i, c in enumerate(conversations)]
+    prompt = [f"<s>[INST] <<SYS>>\n{system_prompt}\n<</SYS>>\n\n {c['content']} [/INST]\n" if system_prompt and i == 0 else f'<s>[INST] {c["content"]} [/INST]' if c['role'] == 'user' else c['content'] for i, c in enumerate(conversations)]
     context = '\n'.join(prompt)
     request = {
         'prompt': context,
         'max_new_tokens': max_new_tokens,# 250,
         'auto_max_new_tokens': False,
         'max_tokens_second': 0,
- 
+
         # Generation params. If 'preset' is set to different than 'None', the values
         # in presets/preset-name.yaml are used instead of the individual numbers.
         'preset': 'None',
@@ -87,7 +88,7 @@ async def generate(
         'grammar_string': '',
         'guidance_scale': 1,
         'negative_prompt': '',
- 
+
         'seed': -1,
         'add_bos_token': True,
         'truncation_length': 2048,
@@ -96,16 +97,16 @@ async def generate(
         'skip_special_tokens': True,
         'stopping_strings': []
     }
- 
+
     async with websockets.connect(URI, ping_interval=None) as websocket:
         await websocket.send(json.dumps(request))
- 
+
         #yield context  # Remove this if you just want to see the reply
         outputs = []
         while True:
             incoming_data = await websocket.recv()
             incoming_data = json.loads(incoming_data)
- 
+
             match incoming_data['event']:
                 case 'text_stream':
                     # print(outputs)
@@ -116,7 +117,7 @@ async def generate(
                         'role': 'assistant',             'content': "".join(outputs),         })
                     print(conversations)
                     return
- 
+
 chat_interface = gr.ChatInterface(
     fn=generate,
     additional_inputs=[
@@ -125,18 +126,18 @@ chat_interface = gr.ChatInterface(
         gr.Slider(label="Temperature", minimum=0.1, maximum=4.0, step=0.1, value=0.7,),
         gr.Slider(label="Top-p (nucleus sampling)", minimum=0.05, maximum=1.0, step=0.05, value=0.1,),
         gr.Slider(label="Top-k", minimum=1, maximum=1000, step=1, value=40,),
-        gr.Slider(label="Repetition penalty", minimum=0.0, maximum=2.0, step=0.05, value=1.18,),
+        gr.Slider(label="Repetition penalty", minimum=1.0, maximum=2.0, step=0.05, value=1.18,),
     ],
     stop_btn=None,
     examples=[
       ["請介紹一下台灣的風景"],
     ],
 )
- 
+
 with gr.Blocks(css="style.css") as demo:
     gr.Markdown(DESCRIPTION)
     chat_interface.render()
     gr.Markdown(LICENSE)
- 
+
 if __name__ == "__main__":
-    demo.queue(max_size=20).launch(server_port=8888, server_name="0.0.0.0")
+    demo.queue(max_size=20).launch()

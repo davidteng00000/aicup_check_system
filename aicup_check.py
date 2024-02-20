@@ -12,7 +12,7 @@ except ImportError:
 
 
 # For local streaming, the websockets are hosted without ssl - ws://
-HOST = '203.145.216.157:60000'
+HOST = 'latest.model.taide.z12.tw:80'
 URI = f'ws://{HOST}/api/v1/stream'
 
 
@@ -21,25 +21,24 @@ URI = f'ws://{HOST}/api/v1/stream'
 
 async def run(context):
 
-    # Note: the selected defaults change from time to time.
     request = {
         'prompt': context,
         'max_new_tokens': 250,# 250,
         'auto_max_new_tokens': False,
         'max_tokens_second': 0,
- 
+
         # Generation params. If 'preset' is set to different than 'None', the values
         # in presets/preset-name.yaml are used instead of the individual numbers.
         'preset': 'None',
         'do_sample': False,
-        'temperature':0.7,#0.7,
+        'temperature': 0.7,#0.7,
         'top_p': 0.1,#0.1,
         'typical_p': 1,
         'epsilon_cutoff': 0,  # In units of 1e-4
         'eta_cutoff': 0,  # In units of 1e-4
         'tfs': 1,
         'top_a': 0,
-        'repetition_penalty': 1.18,#1.18,
+        'repetition_penalty': 1.15,#1.18,
         'repetition_penalty_range': 0,
         'top_k': 40, #40,
         'min_length': 0,
@@ -54,7 +53,7 @@ async def run(context):
         'grammar_string': '',
         'guidance_scale': 1,
         'negative_prompt': '',
- 
+
         'seed': -1,
         'add_bos_token': True,
         'truncation_length': 2048,
@@ -71,16 +70,11 @@ async def run(context):
             incoming_data = await websocket.recv()
             incoming_data = json.loads(incoming_data)
 
-            # match incoming_data['event']:
-            #     case 'text_stream':
-            #         yield incoming_data['text']
-            #     case 'stream_end':
-            #         return
-            if incoming_data['event'] == 'text_stream':
-                yield incoming_data['text']
-            elif incoming_data['event'] == 'text_stream':
-                return
-            
+            match incoming_data['event']:
+                case 'text_stream':
+                    yield incoming_data['text']
+                case 'stream_end':
+                    return
 async def print_response_stream(prompt):
     answer=""
     async for response in run(prompt):   
@@ -108,26 +102,27 @@ def check(input_text, part):
     檢核成功 !\n 原因如下: \n\n1. ... \n2. ... ......"""
     fail_template = """
     檢核失敗 !\n 原因如下: \n\n1. ... \n2. ... ......"""
-    system_prompt = \
-        "等一下將會輸入一些條件與一個要檢核的段落，請你幫我檢測要檢核的段落有沒有符合條件。 \
-        輸入的格式為  「輸入開始: 條件 + 要檢核的段落（條件與要檢核的段落中間以“+”分隔）輸入結束」。 \
-        請嚴格檢查(保留一點彈性)要檢核的段落有沒有符合條件。如果有，請「馬上、立刻、立即」回覆\"檢核成功Passed\"並且提供理由；如果沒有通過，請馬上回覆\"檢核失敗\"並且提供理由。\
-        輸入開始:  條件: " + condition[part] + " + "
+    system_prompt = """等一下將會輸入一些條件與一個要檢核的段落，請你幫我檢測要檢核的段落有沒有符合條件。 
+        輸入的格式為  「輸入開始: 條件 + 要檢核的段落（條件與要檢核的段落中間以“+”分隔）輸入結束」。 
+        請嚴格檢查(保留一點彈性)要檢核的段落有沒有符合條件。如果有，請「馬上、立刻、立即」回覆\"檢核成功Passed\"並且提供理由；如果沒有通過，請馬上回覆\"檢核失敗\"並且提供理由。
+        輸入開始:  條件: """ + condition[part] + " + "
 
     
     prompt = f"<s>[INST] <<SYS>>\n{system_prompt}\n<</SYS>>\n\n 要檢核的段落: {input_text}。\n\n一定要「馬上、立刻、立即」回覆\"檢核成功Passed\"或\"檢核失敗\"。[/INST]\n"
-
-
+    
     
     from argparse import ArgumentParser
     parser = ArgumentParser(prog='General debug things')
     parser.add_argument('--msg', type=str)
     args = parser.parse_args()
-    if len(input_text) > minWords[part]:
+    
+    # if len(input_text) > minWords[part]:
+    if True:
         response=asyncio.run(print_response_stream(prompt))
     else:
         response = "字數不足，請至少提供" + str(minWords[part]) + "字"
-        
+    
+    
     #更新通過紀錄Passed
     if "檢核成功Passed" in response or "檢核成功 Passed" in response or "檢核成功 PASS" in response or "檢核成功PASS" in response:
         Passed[part] = 1
@@ -140,7 +135,7 @@ def check(input_text, part):
         passed = True
     else:
         passed = False
-    
+    print(str(response))
     return str(response)  #回傳AI的回覆
 
 #取得Passed dict裡面的值
@@ -199,9 +194,6 @@ with gr.Blocks() as demo:
                     
                     )
             labels.change(fn=updateValue,inputs=None,outputs=labels,every=0.1,)
-            # if(passed):
-            #     gr.Markdown("[繳交頁面](https://www.aicup.tw/)", visible=False)
-            # gr.Markdown.change("[繳交頁面](https://www.aicup.tw/)", visible=True)
                 
         with gr.Column(scale=3):
             
@@ -258,4 +250,4 @@ with gr.Blocks() as demo:
     
         
 if __name__ == "__main__":
-    demo.queue(max_size=20).launch(share=True)
+    demo.queue(max_size=20).launch(share=False)

@@ -1,0 +1,216 @@
+import websockets
+import asyncio
+import json
+import sys
+import gradio as gr
+
+# Constants (replace with your actual values)
+
+HOST = 'latest.model.taide.z12.tw'
+URI = f'ws://{HOST}/api/v1/stream'
+
+def create_request(context):
+    return {
+        'prompt': context,
+        'max_new_tokens': 250,
+        'auto_max_new_tokens': False,
+        'max_tokens_second': 0,
+        'preset': 'None',
+        'do_sample': True,
+        'temperature': 0.7,
+        'top_p': 0.1,
+        'typical_p': 1,
+        'epsilon_cutoff': 0,  # In units of 1e-4
+        'eta_cutoff': 0,  # In units of 1e-4
+        'tfs': 1,
+        'top_a': 0,
+        'repetition_penalty': 1.18,
+        'repetition_penalty_range': 0,
+        'top_k': 40,
+        'min_length': 0,
+        'no_repeat_ngram_size': 0,
+        'num_beams': 1,
+        'penalty_alpha': 0,
+        'length_penalty': 1,
+        'early_stopping': False,
+        'mirostat_mode': 0,
+        'mirostat_tau': 5,
+        'mirostat_eta': 0.1,
+        'grammar_string': '',
+        'guidance_scale': 1,
+        'negative_prompt': '',
+
+        'seed': -1,
+        'add_bos_token': True,
+        'truncation_length': 2048,
+        'ban_eos_token': False,
+        'custom_token_bans': '',
+        'skip_special_tokens': True,
+        'stopping_strings': []
+    }
+
+async def connect_websocket(uri, request):
+    results = ""  # Store the results
+
+    async with websockets.connect(uri) as websocket: 
+        await websocket.send(json.dumps(request))
+
+        async for message in websocket:
+            incoming_data = json.loads(message)
+            evt = incoming_data['event']
+            if evt == 'text_stream':
+                results += (incoming_data['text'])  # Append to the results
+            elif evt == 'stream_end':
+                break
+            else:
+                print('Unknown event:', incoming_data.get('event')) 
+
+    return results  # Return the collected results
+                
+condition = [" ", 
+            "內容規定：在此段落中，需要詳細說明你的作業系統、程式語言、使用的套件(函式庫)、採用的預訓練模型，以及任何额外的資料集等相關資訊。如果使用了預訓練模型或额外資料集，務必逐一列出來源。這部分提供了展示你所用工具和資源的空間。",
+            "內容規定：此處需要提供你所選用的演算法設計、模型架構和模型參數等相關細節，同時也包括了可能採用的特殊處理方式。這是解釋你如何設計模型、選擇演算法以及設定參數的機會。",
+            "內容規定：這一部分要強調你的演算法所帶來的創新性或者對外部資源做出的具體修改。這也包括解釋哪些部分是你所作的新嘗試，或對已有資源所做的變動。",
+            "內容規定：這段需要清楚地描述你對資料的處理或擴增方式。這可能包括資料的預處理、清理、特徵工程等方面的處理方式，請提供充分的細節描述。",
+            "內容規定：這部分將關注於模型的訓練方式和訓練過程，請詳細說明你採用的訓練方法、優化技術以及模型的訓練歷程。",
+            "內容規定：此區域需要對所使用的模型進行深入的分析與討論，包括模型的成效評估、分析結果的解讀、並簡要提出未來可能的改進方向。同時也可透過成功和失敗的案例來進行具體說明。",
+            "",
+            "內容規定：在這裡需要提供參考文獻清單，需符合APA格式。這是你使用的所有參考資料的列表，請確保格式準確無誤。"
+            ]
+
+async def run(input_text: str, part: int):    # 原名main
+    system_prompt = """等一下將會輸入一些條件與一個要檢核的段落，請你幫我檢測要檢核的段落有沒有符合條件。 
+    輸入的格式為  「輸入開始: 條件 + 要檢核的段落（條件與要檢核的段落中間以“+”分隔）輸入結束」。 
+    請嚴格檢查(保留一點彈性)要檢核的段落有沒有符合條件。如果有，請「馬上、立刻、立即」回覆\"檢核成功Passed\"並且提供理由；如果沒有通過，請馬上回覆\"檢核失敗\"並且提供理由。
+    輸入開始:  條件: """ + condition[part] + " + "
+    prompt = f"<s>[INST] <<SYS>>\n{system_prompt}\n<</SYS>>\n\n 要檢核的段落: {input_text}。\n\n一定要「馬上、立刻、立即」回覆\"檢核成功Passed\"或\"檢核失敗\"。[/INST]\n"
+    request = create_request(prompt)
+    result = await connect_websocket(URI, request)
+    # print('Result', result)
+    return result
+
+def check(input_text: str, part: int, Passed: list[int]):
+    response = asyncio.run(run(input_text, part))
+    #更新通過紀錄Passed
+    if "檢核成功Passed" in response or "檢核成功 Passed" in response or "檢核成功 PASS" in response or "檢核成功PASS" in response or "檢核成功" in response:
+        Passed[part] = 1
+        gr.Info("檢核通過 !")
+        Pass = True
+        for i in Passed:
+            if i == 0:
+                Pass = False
+                break
+    else:
+        Passed[part] = 0
+        gr.Warning("檢核未通過 !")
+    return str(response)
+
+def getPassed(Passed: list[int]):
+    PassList = [1,1,1,1,1,1,1,1,1]
+    for i in range(10):
+        if Passed[i] == 0:
+            PassList[i] = 0
+    return PassList
+
+def update_label(Passed: list[int]):
+    # PassList = getPassed(Passed)
+    PassList = Passed
+    progress = (PassList[1] + PassList[2] + PassList[3] + PassList[4] + PassList[5] + PassList[6] + PassList[8])/7
+    dict = {
+        "完成度" + str(progress) + "%": 1,
+        "壹、環境": PassList[1],
+        "貳、演算方法與模型架構": PassList[2],
+        "參、創新性": PassList[3],
+        "肆、資料處理": PassList[4], 
+        "伍、訓練方式": PassList[5],
+        "陸、分析與結論": PassList[6],
+        "捌、使用的外部資源與參考文獻": PassList[8],
+    }
+    return dict
+    
+
+#主頁面
+with gr.Blocks() as demo:
+    gr.Markdown(
+    """
+    # 報告檢核系統
+    請依序輸入要檢核的段落
+    """)
+    Passed = gr.State(value = [1,0,0,0,0,0,0,1,0])
+    with gr.Row():
+        with gr.Column(scale=1):
+            labels = gr.Label(
+                    label="完成度",
+                    value={
+        "完成度0%": 1,
+        "壹、環境": 0,
+        "貳、演算方法與模型架構": 0,
+        "參、創新性": 0,
+        "肆、資料處理": 0, 
+        "伍、訓練方式": 0,
+        "陸、分析與結論": 0,
+        "捌、使用的外部資源與參考文獻": 0,
+                    },
+                    container=True,
+                    show_label=False,
+                    visible=True,
+                    
+                    )
+            labels.change(fn=update_label,inputs=Passed,outputs=labels,every=0.1,)
+                
+        with gr.Column(scale=3):
+            
+            with gr.Tab(label="壹、環境"):
+                input = gr.Textbox(max_lines=7, lines=7, label="請說明使用的作業系統、語言、套件(函式庫)、預訓練模型、額外資料集等。如使用預訓練模型及額外資料集，請逐一列出來源。(200~600字)")
+                check_btn = gr.Button("Check")
+                part = gr.Slider(1, 8, value=1, visible = False)
+                output = gr.Textbox(label="段落檢核結果")
+                check_btn.click(fn=check, inputs=[input,part,Passed], outputs=output)
+                
+                
+            with gr.Tab(label="貳、演算方法與模型架構"):
+                input = gr.Textbox(max_lines=7, lines=7, label="說明演算法設計、模型架構與模型參數，包括可能使用的特殊處理方式。(400~1200字)")
+                check_btn = gr.Button("Check")
+                part = gr.Slider(1, 8, value=2, visible = False)
+                output = gr.Textbox(label="段落檢核結果")
+                check_btn.click(fn=check, inputs=[input,part,Passed], outputs=output)
+                
+            with gr.Tab(label="參、創新性"):
+                input = gr.Textbox(max_lines=7, lines=7, label="說明演算法之創新性或者修改外部資源的哪一部分。(300~1200字)")
+                check_btn = gr.Button("Check")
+                part = gr.Slider(1, 8, value=3, visible = False)
+                output = gr.Textbox(label="段落檢核結果")
+                check_btn.click(fn=check, inputs=[input,part,Passed], outputs=output)
+                
+            with gr.Tab(label="肆、資料處理"):
+                input = gr.Textbox(max_lines=7, lines=7, label="說明對資料的處理或擴增的方式，例如對資料可能的刪減、更正或增補。(300~1500字)")
+                check_btn = gr.Button("Check")
+                part = gr.Slider(1, 8, value=4, visible = False)
+                output = gr.Textbox(label="段落檢核結果")
+                check_btn.click(fn=check, inputs=[input,part,Passed], outputs=output)
+                
+            with gr.Tab(label="伍、訓練方式"):
+                input = gr.Textbox(max_lines=7, lines=7, label="說明模型的訓練方法與過程。(400~1000字)")
+                check_btn = gr.Button("Check")
+                part = gr.Slider(1, 8, value=5, visible = False)
+                output = gr.Textbox(label="段落檢核結果")
+                check_btn.click(fn=check, inputs=[input,part,Passed], outputs=output)
+                
+            with gr.Tab(label="陸、分析與結論"):
+                input = gr.Textbox(max_lines=7, lines=7, label="分析所使用的模型及其成效，簡述未來可能改進的方向。分析必須附圖，可將幾個成功的和失敗的例子附上並說明之。(400~2500字)")
+                check_btn = gr.Button("Check")
+                part = gr.Slider(1, 8, value=6, visible = False)
+                output = gr.Textbox(label="段落檢核結果")
+                check_btn.click(fn=check, inputs=[input,part,Passed], outputs=output)
+                
+            with gr.Tab(label="捌、使用的外部資源與參考文獻"):
+                input = gr.Textbox(max_lines=7, lines=7, label="參考文獻請以APA格式為主。")
+                check_btn = gr.Button("Check")
+                part = gr.Slider(1, 8, value=8, visible = False)
+                output = gr.Textbox(label="段落檢核結果")
+                check_btn.click(fn=check, inputs=[input,part,Passed], outputs=output)
+        
+    
+        
+if __name__ == "__main__":
+    demo.queue(max_size=20).launch(share=False)
