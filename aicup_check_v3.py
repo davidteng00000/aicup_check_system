@@ -3,69 +3,22 @@ import asyncio
 import json
 import sys
 import gradio as gr
+from huggingface_hub import InferenceClient
 
-# Constants (replace with your actual values)
+client = InferenceClient(model="https://7b-lx-chat.taide.z12.tw")
 
-HOST = 'latest.model.taide.z12.tw'
-URI = f'ws://{HOST}/api/v1/stream'
-
-def create_request(context):
-    return {
-        'prompt': context,
-        'max_new_tokens': 250,
-        'auto_max_new_tokens': False,
-        'max_tokens_second': 0,
-        'preset': 'None',
-        'do_sample': True,
-        'temperature': 0.7,
-        'top_p': 0.1,
-        'typical_p': 1,
-        'epsilon_cutoff': 0,  # In units of 1e-4
-        'eta_cutoff': 0,  # In units of 1e-4
-        'tfs': 1,
-        'top_a': 0,
-        'repetition_penalty': 1.18,
-        'repetition_penalty_range': 0,
-        'top_k': 40,
-        'min_length': 0,
-        'no_repeat_ngram_size': 0,
-        'num_beams': 1,
-        'penalty_alpha': 0,
-        'length_penalty': 1,
-        'early_stopping': False,
-        'mirostat_mode': 0,
-        'mirostat_tau': 5,
-        'mirostat_eta': 0.1,
-        'grammar_string': '',
-        'guidance_scale': 1,
-        'negative_prompt': '',
-
-        'seed': -1,
-        'add_bos_token': True,
-        'truncation_length': 2048,
-        'ban_eos_token': False,
-        'custom_token_bans': '',
-        'skip_special_tokens': True,
-        'stopping_strings': []
-    }
-
-async def connect_websocket(uri, request):
-    results = ""  # Store the results
-
-    async with websockets.connect(uri) as websocket: 
-        await websocket.send(json.dumps(request))
-
-        async for message in websocket:
-            incoming_data = json.loads(message)
-            evt = incoming_data['event']
-            if evt == 'text_stream':
-                results += (incoming_data['text'])  # Append to the results
-            elif evt == 'stream_end':
-                break
-            else:
-                print('Unknown event:', incoming_data.get('event')) 
-
-    return results  # Return the collected results
+def inference(message, history = ""):
+    partial_message = ""
+    for token in client.text_generation(message, 
+                                        max_new_tokens=500, 
+                                        stream=True, 
+                                        # repetition_penalty=3, 
+                                        temperature=0.3, 
+                                        
+                                        ):
+        partial_message += token
+        # yield partial_message
+    return partial_message
                 
 condition = ["",
             "內容規定：請說明使用的作業系統、語言、套件(函式庫)、預訓練模型、額外資料集等。如使用預訓練模型及額外資料集，請逐一列出來源。",
@@ -75,23 +28,27 @@ condition = ["",
             "內容規定：說明模型的訓練方法與過程。",
             "內容規定：分析所使用的模型及其成效，簡述未來可能改進的方向，可將幾個成功的和失敗的例子附上並說明之。",
             "",
-            "內容規定：參考文獻請以APA格式為主。"
+            "內容規定：不一定要有參考文獻。如果有，參考文獻請以APA格式為主。"
             ]
 
-async def run(input_text: str, part: int):    # 原名main
-    system_prompt = """你將收到內容規定和一個段落，請檢查該段落是否符合規定。
-    請根據以下格式回答：如果段落符合規定，請回答：「檢查通過！原因如下：」並以列表的形式列出支持的理由。
-    若段落不符合規定，請回答：「檢查未通過！原因如下：」並以列表的形式列出支持的理由。
-    請盡量簡化和明確你的回答。
-    """
-    prompt = f"<s>[INST] <<SYS>>\n{system_prompt}\n<</SYS>>\n{condition[part]} + {input_text}。[/INST]"
-    request = create_request(prompt)
-    result = await connect_websocket(URI, request)
-    # print('Result', result)
-    return result
+minLength = [0,100,250,200,200,250,250, 0, 0]
 
 def check(input_text: str, part: int, Passed: list[int]):
-    response = asyncio.run(run(input_text, part))
+    
+    
+    
+    system_prompt = """
+    你將收到內容規定和一個段落，請檢查該段落是否符合規定，不必嚴格檢查，保留一些彈性。
+    請根據以下格式回答：如果段落符合規定，請回答：「檢查通過！原因如下：」並以列點的形式列出支持的理由，請勿覆述段落內容。
+    若段落不符合規定，請回答：「檢查未通過！原因如下：」並以列點的形式列出支持的理由，請勿覆述段落內容。
+    回覆必須以「檢查通過！原因如下：」或是「檢查未通過！原因如下：」為開頭。
+    請盡量簡化和明確你的回答。
+    """
+    prompt = f"<s>[INST] <<SYS>>\n{system_prompt} \n\n{condition[part]}\n<</SYS>>\n\n 段落: {input_text}。回覆必須以「檢查通過！原因如下：」或是「檢查未通過！原因如下：」為開頭。[/INST]"
+    if len(input_text) < minLength[part]:
+        response = "字數不足，檢核未通過 !"
+    else:
+        response = inference(prompt)
     #更新通過紀錄Passed
     if "檢查通過" in response:
         Passed[part] = 1
