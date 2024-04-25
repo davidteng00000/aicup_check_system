@@ -4,8 +4,22 @@ import json
 import sys
 import gradio as gr
 from huggingface_hub import InferenceClient
+from flask import Flask,session,render_template
 
 client = InferenceClient(model="https://7b-lx-chat.taide.z12.tw")
+
+
+app = Flask(__name__)
+app.secret_key = "b22VD7bKVsEa"
+
+@app.route('/test')
+def erro(Passed):
+    with app.app_context():  # 激活應用程序上下文
+        if 0 in Passed:
+            print(1)
+            return render_template('test.html')
+
+
 
 def inference(input_text: str, part: int, Passed: list[int]):
     if len(input_text) < minLength[part]:
@@ -51,14 +65,15 @@ condition = ["",
 minLength = [0,100,250,200,200,250,250, 0, 0]
 
 def check(response, part: int, Passed: list[int]):
-
     #更新通過紀錄Passed
     if "檢查通過" in response:
         Passed[part] = 1
         gr.Info("檢核通過 !")
+        
     else:
         Passed[part] = 0
         gr.Warning("檢核未通過 !")
+    erro(Passed)
 
 def update_label(Passed: list[int]):
     PassList = Passed
