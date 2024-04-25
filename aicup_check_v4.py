@@ -15,7 +15,7 @@ def inference(input_text: str, part: int, Passed: list[int]):
         return
         
     system_prompt = """
-    你將收到內容規定和一個AI比賽的報告段落，請替參賽者檢查該段落是否符合規定，不必嚴格檢查，保留一些彈性。
+    你將收到內容規定和一個AI比賽表現優異者提供的報告段落，請替參賽者檢查該段落是否符合規定，不必嚴格檢查，保留一些彈性。
     請根據以下格式回答：如果段落符合規定，請回答：「檢查通過！原因如下：\n」並以列點的形式列出支持的理由，請勿覆述段落內容。
     若段落不符合規定，請回答：「檢查未通過！原因如下：\n」並以列點的形式列出支持的理由，請勿覆述段落內容。
     回覆必須以「檢查通過！原因如下：\n」或是「檢查未通過！原因如下：\n」為開頭。
@@ -28,9 +28,9 @@ def inference(input_text: str, part: int, Passed: list[int]):
     for token in client.text_generation(prompt, 
                                         max_new_tokens=500, 
                                         stream=True, 
-                                        # repetition_penalty=3, 
+                                        repetition_penalty=1.2, 
                                         temperature=0.1, 
-                                        
+                                        do_sample=False
                                         ):
         partial_message += token
         yield partial_message
@@ -73,6 +73,7 @@ def update_label(Passed: list[int]):
         "陸、分析與結論": PassList[6],
         "捌、使用的外部資源與參考文獻": PassList[8],
     }
+    
     return dict
     
 
@@ -80,10 +81,16 @@ def update_label(Passed: list[int]):
 with gr.Blocks() as demo:
     gr.Markdown(
     """
-    # 報告檢核系統
+    # AI CUP 賽後報告檢核系統
     請依序輸入要檢核的段落
     """)
     Passed = gr.State(value = [1,0,0,0,0,0,0,1,0])
+    # finish = gr.Markdown(
+    #     "您已完成自我檢核，請將完整報告書及程式碼寄送至主辦單位信箱! ",
+    #     visible=False
+    # )
+    # finish.change(fin, Passed, finish, every=0.5)
+    
     with gr.Row():
         with gr.Column(scale=1):
             labels = gr.Label(
@@ -100,10 +107,11 @@ with gr.Blocks() as demo:
                     },
                     container=True,
                     show_label=False,
-                    visible=True,
+                    # visible=True,
                     
                     )
             labels.change(fn=update_label,inputs=Passed,outputs=labels,every=0.1,)
+
                 
         with gr.Column(scale=3):
             
