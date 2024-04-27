@@ -8,17 +8,20 @@ from flask import Flask,session,render_template
 
 client = InferenceClient(model="https://7b-lx-chat.taide.z12.tw")
 
-
-app = Flask(__name__)
-app.secret_key = "b22VD7bKVsEa"
-
-@app.route('/test')
-def erro(Passed):
-    with app.app_context():  # 激活應用程序上下文
-        if 0 in Passed:
-            print(1)
-            return render_template('test.html')
-
+# js="""
+# function showCompletionAlert(Passed) {
+#     var flag = true;
+#     for(int i = 0; i<=8; i++){
+#         if(Passed[i] == 0){
+#             flag = true;
+#         }
+#     }
+#     if(flag) alert("您已完成自我檢核,請將完整報告書及程式碼寄送至主辦單位信箱!");
+# }
+# """
+# js1="function showCompletionAlert() {
+#    alert("您已完成自我檢核,請將完整報告書及程式碼寄送至主辦單位信箱!");
+#  }"
 
 
 def inference(input_text: str, part: int, Passed: list[int]):
@@ -29,21 +32,22 @@ def inference(input_text: str, part: int, Passed: list[int]):
         return
         
     system_prompt = """
-    你將收到內容規定和一個AI比賽表現優異者提供的報告段落，請替參賽者檢查該段落是否符合規定，不必嚴格檢查，保留一些彈性。
-    請根據以下格式回答：如果段落符合規定，請回答：「檢查通過！原因如下：\n」並以列點的形式列出支持的理由，請勿覆述段落內容。
-    若段落不符合規定，請回答：「檢查未通過！原因如下：\n」並以列點的形式列出支持的理由，請勿覆述段落內容。
-    回覆必須以「檢查通過！原因如下：\n」或是「檢查未通過！原因如下：\n」為開頭。
+    將收到內容規定和報告段落，請替參賽者檢查該段落是否符合規定，不必嚴格檢查，保留一些彈性。
+    請根據以下格式回答：如果段落符合規定，請回答：「檢查通過！原因如下：」並以列點的形式列出支持的理由，請勿覆述段落內容。
+    若段落不符合規定，請回答：「檢查未通過！原因如下：」並以列點的形式列出支持的理由，請勿覆述段落內容。
+    回覆開頭為「檢查通過！原因如下：」或是「檢查未通過！原因如下：」。
+    回答時請勿複述段落內容。
     請盡量簡化和明確你的回答。
     """
-    prompt = f"<s>[INST] <<SYS>>\n{system_prompt} \n\n{condition[part]}\n<</SYS>>\n\n 段落: {input_text}。\n\n你的工作是檢查段落是否符合以下條件: {condition[part]}。\n回覆必須以「檢查通過！原因如下：\n」或是「檢查未通過！原因如下：\n」為開頭。如果段落內容明顯與上面提到的背景不相合，或是未符合內容規定，請直接判定為不通過。[/INST]"
+    prompt = f"<s>[INST] <<SYS>>\n{system_prompt} \n{condition[part]}\n<</SYS>>\n\n 段落: {input_text}。\n\n請檢查段落是否符合以下條件: {condition[part]}。\n回覆開頭為「檢查通過！原因如下：」或是「檢查未通過！原因如下：」。[/INST]"
 
     
-    partial_message = ""
+    partial_message = ''
     for token in client.text_generation(prompt, 
                                         max_new_tokens=500, 
                                         stream=True, 
-                                        repetition_penalty=1.2, 
-                                        temperature=0.1, 
+                                        repetition_penalty=1.1, 
+                                        temperature=0.2, 
                                         do_sample=False
                                         ):
         partial_message += token
@@ -73,7 +77,7 @@ def check(response, part: int, Passed: list[int]):
     else:
         Passed[part] = 0
         gr.Warning("檢核未通過 !")
-    erro(Passed)
+
 
 def update_label(Passed: list[int]):
     PassList = Passed
@@ -88,6 +92,8 @@ def update_label(Passed: list[int]):
         "陸、分析與結論": PassList[6],
         "捌、使用的外部資源與參考文獻": PassList[8],
     }
+    # if 0 in Passed:
+    
     
     return dict
     
