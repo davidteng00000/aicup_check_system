@@ -1,12 +1,32 @@
+import threading
+import websockets
+import asyncio
+import json
+import sys
 import gradio as gr
+from huggingface_hub import InferenceClient
+import threading
+from flask import Flask,session,render_template
 
-with gr.Blocks() as demo:
-    with gr.Row():
-        delete_btn = gr.Button("Delete")
-        confirm_btn = gr.Button("Confirm delete", variant="stop", visible=False)
-        cancel_btn = gr.Button("Cancel", visible=False)
-        
-        delete_btn.click(lambda :[gr.update(visible=False), gr.update(visible=True), gr.update(visible=True)], None, [delete_btn, confirm_btn, cancel_btn])
-        cancel_btn.click(lambda :[gr.update(visible=True), gr.update(visible=False), gr.update(visible=False)], None, [delete_btn, confirm_btn, cancel_btn])
-    
-demo.launch()
+
+
+def handle_user_request(prompt):
+    client = InferenceClient(model="https://7b-lx-chat.taide.z12.tw")
+    partial_message = ''
+    for token in client.text_generation(prompt, 
+                                        max_new_tokens=500, 
+                                        stream=False, 
+                                        repetition_penalty=1.1, 
+                                        temperature=0.12, 
+                                        do_sample=False):  # 沿用您的參數設定
+        partial_message += token
+    print(partial_message)  # 回傳給使用者
+
+def main():
+    while True:
+        prompt = input("請輸入您的問題：")
+        thread = threading.Thread(target=handle_user_request, args=(prompt,))
+        thread.start()
+
+if __name__ == "__main__":
+    main()
