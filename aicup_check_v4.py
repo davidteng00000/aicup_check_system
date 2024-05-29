@@ -95,7 +95,7 @@ condition = ["",
             "內容規定：必須說明模型的訓練方法與過程，若無關則檢查不通過。",
             "內容規定：說明分析並總結。",
             "",
-            "內容規定：說明\"沒有參考文獻\"或是以APA格式提供參考文獻"
+            "內容規定：以APA/IEEE格式提供參考文獻，或是直接註明沒有參考文獻，不需要理由"
             ]
 
 minLength = [0,100,250,200,200,250,250, 0, 0]
@@ -135,7 +135,8 @@ with gr.Blocks() as demo:
     gr.Markdown(
     """
     # AI CUP 賽後報告檢核系統
-    請依序輸入要檢核的段落
+    請依序輸入要檢核的段落\n
+    本檢核系統基於國科會TAIDE模型開發，目前為demo版，僅為服務參賽者自我檢核，並輔助完成報告。實際敘獎、評分仍100%依競賽評審委員判定為準，系統所提供的完成度、評語或建議，均不涉及評審結果。如有任何改善建議，歡迎您來信moe.ai.ncu@gmail.com。您的寶貴意見將使台灣本土大型語言模型應用愈加蓬勃：）
     """)
     Passed = gr.State(value = [1,0,0,0,0,0,0,1,0])
     # finish = gr.Markdown(
@@ -212,7 +213,7 @@ with gr.Blocks() as demo:
                 check_btn.click(fn=inference, inputs=[input,part,Passed], outputs=output)
                 
             with gr.Tab(label="捌、使用的外部資源與參考文獻"):
-                input = gr.Textbox(max_lines=7, lines=7, label="參考文獻請以APA格式為主。")
+                input = gr.Textbox(max_lines=7, lines=7, label="參考文獻請以APA或IEEE格式為主。")
                 check_btn = gr.Button("Check")
                 part = gr.Slider(1, 8, value=8, visible = False)
                 output = gr.Textbox(label="段落檢核結果", lines=15, max_lines=15)
