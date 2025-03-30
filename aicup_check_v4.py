@@ -7,6 +7,7 @@ from huggingface_hub import InferenceClient
 import threading
 from queue import Queue
 from flask import Flask,session,render_template
+from APIs.Openai.sync_api import *
 
 client = InferenceClient(model="https://7b-lx-chat.taide.z12.tw")
 
